@@ -279,16 +279,24 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen bg-ink px-4 py-8 sm:py-12">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 className="font-serifTC text-goldSoft text-xl sm:text-2xl font-bold">
             後台管理｜會員帳號
           </h1>
-          <Link
-            href="/"
-            className="text-goldSoft/80 text-sm border border-gold/40 rounded px-3 py-1.5 hover:bg-lacquerDark"
-          >
-            回到廟門
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/prayers"
+              className="text-ink text-sm bg-goldSoft rounded px-3 py-1.5 font-semibold hover:opacity-90"
+            >
+              今日待祈福／敬獻紀錄
+            </Link>
+            <Link
+              href="/"
+              className="text-goldSoft/80 text-sm border border-gold/40 rounded px-3 py-1.5 hover:bg-lacquerDark"
+            >
+              回到廟門
+            </Link>
+          </div>
         </div>
 
         {toast && <div className="mb-4 text-sm text-ink bg-goldSoft rounded px-3 py-2">{toast}</div>}
