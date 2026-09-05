@@ -1,121 +1,41 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { WorshipOrder } from "@/lib/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Account, Offering, PrayerRecipient, WorshipOrder } from "@/lib/types";
+import PointsBadge from "@/components/PointsBadge";
+import { OFFERING_ICONS } from "@/components/icons/OfferingIcons";
 
-function PrintPageContent() {
-  const searchParams = useSearchParams();
-  const idsParam = searchParams.get("ids") || "";
-  const ids = useMemo(() => idsParam.split(",").filter(Boolean), [idsParam]);
-  const [orders, setOrders] = useState<WorshipOrder[]>([]);
+function lunar(r: PrayerRecipient) { return `${r.lunar_birth_year ?? "—"}年${r.lunar_birth_leap_month ? "閏" : ""}${r.lunar_birth_month ?? "—"}月${r.lunar_birth_day ?? "—"}日`; }
 
-  useEffect(() => {
-    if (ids.length === 0) {
-      setOrders([]);
-      return;
-    }
+export default function AltarPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true), [submitting, setSubmitting] = useState(false);
+  const [account, setAccount] = useState<Account | null>(null), [offerings, setOfferings] = useState<Offering[]>([]), [recipients, setRecipients] = useState<PrayerRecipient[]>([]), [orders, setOrders] = useState<WorshipOrder[]>([]);
+  const [recipientId, setRecipientId] = useState<number | null>(null), [selected, setSelected] = useState<number[]>([]), [message, setMessage] = useState("");
+  const [showAdd, setShowAdd] = useState(false), [newR, setNewR] = useState({ relationship:"家人", name:"", year:"", month:"", day:"", leap:false, address:"" });
 
-    Promise.all(
-      ids.map((id) => fetch(`/api/admin/prayers/${id}`).then((r) => r.json()))
-    ).then(setOrders);
-  }, [ids]);
+  const loadData = useCallback(async () => {
+    const meRes = await fetch("/api/me"); if (meRes.status === 401) return router.replace("/login");
+    const [me, offRes, recRes, ordRes] = await Promise.all([meRes.json(), fetch("/api/offerings"), fetch("/api/recipients"), fetch("/api/orders")]);
+    setAccount(me); const offs=await offRes.json(), recs=await recRes.json(), ords=await ordRes.json();
+    if(offRes.ok)setOfferings(offs); if(recRes.ok){setRecipients(recs); setRecipientId((x)=>x ?? recs[0]?.id ?? null);} if(ordRes.ok)setOrders(ords); setLoading(false);
+  }, [router]);
+  useEffect(()=>{loadData()},[loadData]);
+  const total = useMemo(()=>offerings.filter(o=>selected.includes(o.id)).reduce((s,o)=>s+o.cost,0),[offerings,selected]);
+  const chosenRecipient = recipients.find(r=>r.id===recipientId);
 
-  return (
-    <main className="print-root bg-neutral-100 min-h-screen py-6">
-      <div className="no-print max-w-[210mm] mx-auto mb-4 flex gap-2 px-4">
-        <button
-          onClick={() => window.print()}
-          className="bg-black text-white rounded px-4 py-2"
-        >
-          列印／另存 PDF
-        </button>
-        <button
-          onClick={() => window.close()}
-          className="border border-black rounded px-4 py-2"
-        >
-          關閉
-        </button>
-      </div>
+  function toggle(id:number){setSelected(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);}
+  async function worship(){ if(!recipientId || selected.length===0)return; if(!confirm(`確認敬獻 ${selected.length} 種供品，共 ${total.toLocaleString()} CDTB？`))return; setSubmitting(true);setMessage(""); const res=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recipient_id:recipientId,offering_ids:selected})}); const data=await res.json(); setSubmitting(false); if(!res.ok)return setMessage(data.error??"敬獻失敗"); setAccount(p=>p?{...p,points:data.new_points}:p);setSelected([]);setMessage(`敬獻成功｜編號 ${data.order_no}`);loadData(); }
+  async function addRecipient(e:React.FormEvent){e.preventDefault();const res=await fetch("/api/recipients",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({relationship:newR.relationship,name:newR.name,lunar_birth_year:Number(newR.year),lunar_birth_month:Number(newR.month),lunar_birth_day:Number(newR.day),lunar_birth_leap_month:newR.leap,address:newR.address})});const data=await res.json();if(!res.ok)return setMessage(data.error??"新增失敗");setShowAdd(false);setNewR({relationship:"家人",name:"",year:"",month:"",day:"",leap:false,address:""});await loadData();setRecipientId(data.id);}
+  async function logout(){await fetch("/api/auth/logout",{method:"POST"});router.replace("/login")}
 
-      {orders.map((o) => (
-        <article
-          key={o.id}
-          className="a4-page bg-white mx-auto p-[18mm] text-black"
-        >
-          <header className="text-center border-b-2 border-black pb-4">
-            <h1 className="text-3xl font-bold tracking-[.2em]">員林財德宮</h1>
-            <h2 className="text-xl font-bold mt-2">敬獻祈福資料單</h2>
-          </header>
-
-          <p className="mt-5 text-sm">
-            敬獻編號：<strong>{o.order_no}</strong>
-          </p>
-
-          <section className="mt-6">
-            <h3 className="font-bold text-lg border-b border-black pb-1">祈福資料</h3>
-            <div className="mt-3 space-y-2 text-base">
-              <p>姓名：{o.prayer_name}</p>
-              <p>
-                農曆生日：{o.prayer_lunar_birth_year}年
-                {o.prayer_lunar_birth_leap_month ? "閏" : ""}
-                {o.prayer_lunar_birth_month}月{o.prayer_lunar_birth_day}日
-              </p>
-              <p>地址：{o.prayer_address}</p>
-              <p>
-                會員帳號：{o.account_no}
-                {o.member?.line_display_name
-                  ? `　LINE 名稱：${o.member.line_display_name}`
-                  : ""}
-              </p>
-            </div>
-          </section>
-
-          <section className="mt-7">
-            <h3 className="font-bold text-lg border-b border-black pb-1">敬獻資料</h3>
-            <div className="mt-3 space-y-2 text-base">
-              <p>
-                供品：<strong>{o.items?.map((i) => i.offering_name).join("、")}</strong>
-              </p>
-              <p>
-                敬獻時間：
-                {new Date(o.created_at).toLocaleString("zh-TW", {
-                  timeZone: "Asia/Taipei",
-                })}
-              </p>
-              <p>使用點數：{o.total_points.toLocaleString()} CDTB</p>
-            </div>
-          </section>
-
-          <section className="mt-9">
-            <h3 className="font-bold text-lg border-b border-black pb-1">宮方處理</h3>
-            <div className="mt-4 space-y-5 text-base">
-              <p>□ 已完成祈福</p>
-              <p>完成日期：________________________________</p>
-              <p>備註：____________________________________</p>
-              <p>　　　____________________________________</p>
-            </div>
-          </section>
-
-          <footer className="mt-12 text-center text-xs text-neutral-500">
-            本資料單僅供員林財德宮祈福作業使用
-          </footer>
-        </article>
-      ))}
-    </main>
-  );
-}
-
-export default function PrintPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen flex items-center justify-center bg-neutral-100">
-          <p>正在載入祈福資料...</p>
-        </main>
-      }
-    >
-      <PrintPageContent />
-    </Suspense>
-  );
+  if(loading||!account)return <main className="min-h-screen flex items-center justify-center bg-ink"><p className="text-goldSoft">敬請稍候，正在開啟廟門…</p></main>;
+  return <main className="min-h-screen bg-ink pb-12"><section className="relative h-[55vh] min-h-[380px] overflow-hidden"><Image src="/temple-bg.jpg" alt="財神廟神龕" fill priority className="object-cover object-[center_30%]"/><div className="absolute inset-0 bg-gradient-to-b from-ink/40 via-ink/10 to-ink"/><PointsBadge points={account.points} displayName={account.display_name||account.real_name||`帳號 ${account.account_no}`}/><div className="absolute top-4 left-4 z-20 flex gap-2"><button onClick={logout} className="text-xs text-goldSoft border border-gold/50 rounded px-3 py-1.5 bg-ink/50">登出（{account.account_no}）</button><button onClick={()=>router.push('/profile')} className="text-xs text-goldSoft border border-gold/50 rounded px-3 py-1.5 bg-ink/50">會員資料</button></div>{account.is_admin&&<button onClick={()=>router.push("/admin")} className="absolute bottom-4 left-4 bg-gold text-ink font-semibold rounded px-3 py-1.5 z-20">後台管理</button>}<div className="absolute bottom-6 w-full text-center"><h1 className="font-serifTC text-goldSoft text-3xl sm:text-4xl font-bold">網路財神廟</h1><p className="text-goldSoft/80 text-sm">一次可選多種供品，同一張敬獻祈福單</p></div></section>
+  <section className="relative -mt-5 px-4 z-10 max-w-5xl mx-auto space-y-5"><div className="rounded-2xl bg-parchment border border-gold/50 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs text-ink/60">本次祈福對象</p><select value={recipientId??""} onChange={e=>setRecipientId(Number(e.target.value))} className="mt-1 rounded border border-gold/50 px-3 py-2 bg-white font-medium">{recipients.map(r=><option key={r.id} value={r.id}>{r.relationship||"祈福對象"}｜{r.name}</option>)}</select></div><button onClick={()=>setShowAdd(!showAdd)} className="text-sm border border-lacquer text-lacquer rounded px-3 py-2">＋新增祈福對象</button></div>{chosenRecipient&&<p className="mt-3 text-xs text-ink/60">農曆 {lunar(chosenRecipient)}｜{chosenRecipient.address}</p>}
+  {showAdd&&<form onSubmit={addRecipient} className="mt-4 border-t border-gold/30 pt-4 grid sm:grid-cols-2 gap-3"><input required placeholder="關係，例如：母親" value={newR.relationship} onChange={e=>setNewR({...newR,relationship:e.target.value})} className="rounded border px-3 py-2"/><input required placeholder="姓名" value={newR.name} onChange={e=>setNewR({...newR,name:e.target.value})} className="rounded border px-3 py-2"/><div className="sm:col-span-2 grid grid-cols-3 gap-2"><input required type="number" placeholder="農曆年" value={newR.year} onChange={e=>setNewR({...newR,year:e.target.value})} className="rounded border px-3 py-2"/><input required type="number" min="1" max="12" placeholder="月" value={newR.month} onChange={e=>setNewR({...newR,month:e.target.value})} className="rounded border px-3 py-2"/><input required type="number" min="1" max="30" placeholder="日" value={newR.day} onChange={e=>setNewR({...newR,day:e.target.value})} className="rounded border px-3 py-2"/></div><label className="text-sm"><input type="checkbox" checked={newR.leap} onChange={e=>setNewR({...newR,leap:e.target.checked})}/> 閏月</label><input required placeholder="祈福地址" value={newR.address} onChange={e=>setNewR({...newR,address:e.target.value})} className="rounded border px-3 py-2"/><button className="sm:col-span-2 bg-lacquer text-goldSoft rounded py-2">儲存祈福對象</button></form>}</div>
+  <div className="rounded-2xl bg-lacquerDark/95 border border-gold/40 p-5 sm:p-7"><p className="text-center text-goldSoft mb-5">勾選本次要敬獻的供品</p><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">{offerings.map(o=>{const Icon=OFFERING_ICONS[o.icon_key];const active=selected.includes(o.id);return <button key={o.id} onClick={()=>toggle(o.id)} className={`relative rounded-xl border p-4 bg-parchment transition ${active?"ring-2 ring-ember border-ember":"border-gold/50"}`}><div className="w-12 h-12 mx-auto"><Icon/></div><p className="font-serifTC font-semibold text-ink mt-2">{o.name}</p><p className="text-xs text-lacquer mt-1">{o.cost.toLocaleString()} CDTB</p>{active&&<span className="absolute top-2 right-2 bg-ember text-white rounded-full w-6 h-6 text-sm">✓</span>}</button>})}</div><div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-3 border-t border-gold/30 pt-5"><div className="text-goldSoft"><span className="text-sm">已選 {selected.length} 項｜合計</span> <strong className="text-xl ml-2">{total.toLocaleString()} CDTB</strong></div><button onClick={worship} disabled={submitting||selected.length===0||!recipientId||account.points<total} className="bg-gold text-ink font-bold rounded-lg px-6 py-3 disabled:opacity-40">{submitting?"敬獻處理中…":"確認敬獻"}</button></div>{message&&<p className="text-center mt-4 text-goldSoft">{message}</p>}{account.points<total&&selected.length>0&&<p className="text-center text-sm text-red-200 mt-2">CDTB 點數不足</p>}</div>
+  <div className="rounded-2xl bg-parchment p-5 border border-gold/40"><h2 className="font-serifTC font-bold text-lacquer mb-3">近 18 個月我的敬獻</h2><div className="space-y-2">{orders.slice(0,8).map(o=><div key={o.id} className="flex flex-wrap justify-between gap-2 border-b border-gold/20 py-2 text-sm"><span>{new Date(o.created_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span><span>{o.items?.map(i=>i.offering_name).join("、")}</span><span>{o.prayer_name}</span><span className={o.status==="completed"?"text-green-700":"text-amber-700"}>{o.status==="completed"?"已完成祈福":"待祈福"}</span></div>)}{orders.length===0&&<p className="text-sm text-ink/50">目前還沒有敬獻紀錄</p>}</div></div>
+  </section></main>;
 }
