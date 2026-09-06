@@ -35,5 +35,38 @@ export default function PrayerAdminPage(){
   >
     {o.line_bound ? "✓ 已綁定 LINE" : "未綁定 LINE"}
   </p>
-</td><td className="p-3"><p className="font-medium">{o.prayer_name}</p><p className="text-xs text-ink/50">農曆 {o.prayer_lunar_birth_year}年{o.prayer_lunar_birth_leap_month?'閏':''}{o.prayer_lunar_birth_month}月{o.prayer_lunar_birth_day}日</p><p className="text-xs max-w-[240px]">{o.prayer_address}</p></td><td className="p-3">{o.items?.map(i=>i.offering_name).join('、')}</td><td className="p-3">{o.total_points.toLocaleString()}</td><td className="p-3"><span className={o.status==='completed'?'text-green-700':'text-amber-700'}>{o.status==='completed'?'已完成':'待祈福'}</span>{o.completed_at&&<p className="text-xs text-ink/50">{new Date(o.completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})}</p>}</td><td className="p-3"><div className="flex gap-1"><button onClick={()=>print([o.id])} className="border border-lacquer text-lacquer rounded px-2 py-1">列印</button>{o.status==='pending'&&<button onClick={()=>complete(o.id)} className="bg-lacquer text-goldSoft rounded px-2 py-1">完成祈福</button>}</div></td></tr>)}{orders.length===0&&<tr><td colSpan={8} className="bg-parchment text-center text-ink/50 p-8">目前沒有符合的敬獻紀錄</td></tr>}</tbody></table></div></div></main>
+</td><td className="p-3"><p className="font-medium">{o.prayer_name}</p><p className="text-xs text-ink/50">農曆 {o.prayer_lunar_birth_year}年{o.prayer_lunar_birth_leap_month?'閏':''}{o.prayer_lunar_birth_month}月{o.prayer_lunar_birth_day}日</p><p className="text-xs max-w-[240px]">{o.prayer_address}</p></td><td className="p-3">{o.items?.map(i=>i.offering_name).join('、')}</td><td className="p-3">{o.total_points.toLocaleString()}</td><td className="p-3">
+  <span className={o.status==='completed'?'text-green-700':'text-amber-700'}>
+    {o.status==='completed'?'已完成':'待祈福'}
+  </span>
+
+  {o.completed_at&&
+    <p className="text-xs text-ink/50">
+      {new Date(o.completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})}
+    </p>
+  }
+
+  {o.status==='completed'&&o.line_notify_status==='sent'&&
+    <div className="mt-2">
+      <p className="text-xs font-medium text-green-700">✓ LINE 已通知</p>
+      {o.line_notified_at&&
+        <p className="text-xs text-ink/50">
+          {new Date(o.line_notified_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})}
+        </p>
+      }
+    </div>
+  }
+
+  {o.status==='completed'&&o.line_notify_status==='failed'&&
+    <p className="text-xs font-medium text-red-600 mt-2">
+      ⚠ LINE 通知失敗
+    </p>
+  }
+
+  {o.status==='completed'&&o.line_notify_status==='unbound'&&
+    <p className="text-xs font-medium text-amber-700 mt-2">
+      未綁定 LINE
+    </p>
+  }
+</td><td className="p-3"><div className="flex gap-1"><button onClick={()=>print([o.id])} className="border border-lacquer text-lacquer rounded px-2 py-1">列印</button>{o.status==='pending'&&<button onClick={()=>complete(o.id)} className="bg-lacquer text-goldSoft rounded px-2 py-1">完成祈福</button>}</div></td></tr>)}{orders.length===0&&<tr><td colSpan={8} className="bg-parchment text-center text-ink/50 p-8">目前沒有符合的敬獻紀錄</td></tr>}</tbody></table></div></div></main>
 }
