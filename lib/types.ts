@@ -8,7 +8,7 @@ export type Account = {
   lunar_birth_leap_month?: boolean;
   address?: string | null;
   line_display_name?: string | null;
-  points: number;
+  line_user_id?: string | null;  points: number;
   is_admin: boolean;
   created_at: string;
 };
