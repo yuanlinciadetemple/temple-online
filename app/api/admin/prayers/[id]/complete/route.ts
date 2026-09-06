@@ -81,45 +81,45 @@ export async function POST(
   }
 
   // 以下 LINE 通知即使失敗，也不影響祈福完成
-  try {
-    const { data: order } = await supabaseAdmin
-      .from("worship_orders")
-      .select(
-        "id, order_no, account_no, prayer_name, total_points, completed_at"
-      )
-      .eq("id", orderId)
+try {
+  const { data: order } = await supabaseAdmin
+    .from("worship_orders")
+    .select(
+      "id, order_no, account_no, prayer_name, total_points, completed_at"
+    )
+    .eq("id", orderId)
+    .single();
+
+  if (order) {
+    const { data: account } = await supabaseAdmin
+      .from("accounts")
+      .select("line_user_id")
+      .eq("account_no", order.account_no)
       .single();
 
-    if (order) {
-      const { data: account } = await supabaseAdmin
-        .from("accounts")
-        .select("line_user_id")
-        .eq("account_no", order.account_no)
-        .single();
+    const { data: items } = await supabaseAdmin
+      .from("worship_order_items")
+      .select("offering_name")
+      .eq("worship_order_id", orderId)
+      .order("id", { ascending: true });
 
-      const { data: items } = await supabaseAdmin
-        .from("worship_order_items")
-        .select("offering_name")
-        .eq("worship_order_id", orderId)
-        .order("id", { ascending: true });
+    if (account?.line_user_id) {
+      const offeringNames =
+        items?.map((item) => item.offering_name).join("、") ||
+        "敬獻供品";
 
-      if (account?.line_user_id) {
-        const offeringNames =
-          items?.map((item) => item.offering_name).join("、") ||
-          "敬獻供品";
+      const completedTime = order.completed_at
+        ? new Date(order.completed_at).toLocaleString("zh-TW", {
+            timeZone: "Asia/Taipei",
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "";
 
-        const completedTime = order.completed_at
-          ? new Date(order.completed_at).toLocaleString("zh-TW", {
-              timeZone: "Asia/Taipei",
-              year: "numeric",
-              month: "numeric",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "";
-
-        const message =
+      const message =
 `🙏 員林財德宮祈福通知
 
 祈福對象：${order.prayer_name}
@@ -134,24 +134,49 @@ ${completedTime ? `完成時間：${completedTime}` : ""}
 
 員林財德宮 敬啟`;
 
-        const sent = await sendLinePush(
-          account.line_user_id,
-          message
-        );
+      const sent = await sendLinePush(
+        account.line_user_id,
+        message
+      );
 
-        console.log(
-          sent
-            ? `LINE 完成通知已傳送：會員 ${order.account_no}`
-            : `LINE 完成通知傳送失敗：會員 ${order.account_no}`
-        );
-      } else {
-        console.log(
-          `會員 ${order.account_no} 尚未綁定 LINE，不傳送通知`
-        );
-      }
+      await supabaseAdmin
+        .from("worship_orders")
+        .update({
+          line_notify_status: sent ? "sent" : "failed",
+          line_notified_at: sent ? new Date().toISOString() : null,
+        })
+        .eq("id", orderId);
+
+      console.log(
+        sent
+          ? `LINE 完成通知已傳送：會員 ${order.account_no}`
+          : `LINE 完成通知傳送失敗：會員 ${order.account_no}`
+      );
+    } else {
+      await supabaseAdmin
+        .from("worship_orders")
+        .update({
+          line_notify_status: "unbound",
+          line_notified_at: null,
+        })
+        .eq("id", orderId);
+
+      console.log(
+        `會員 ${order.account_no} 尚未綁定 LINE，不傳送通知`
+      );
     }
-  } catch (notifyError) {
-    console.error("LINE 祈福完成通知發生錯誤:", notifyError);
+  }
+} catch (notifyError) {
+  console.error("LINE 祈福完成通知發生錯誤:", notifyError);
+
+  await supabaseAdmin
+    .from("worship_orders")
+    .update({
+      line_notify_status: "failed",
+      line_notified_at: null,
+    })
+    .eq("id", orderId);
+}
   }
 
   return NextResponse.json(data);
