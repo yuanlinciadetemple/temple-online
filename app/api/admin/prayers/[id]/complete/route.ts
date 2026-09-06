@@ -177,7 +177,6 @@ ${completedTime ? `完成時間：${completedTime}` : ""}
     })
     .eq("id", orderId);
 }
-  }
 
   return NextResponse.json(data);
 }
