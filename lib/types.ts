@@ -60,7 +60,8 @@ export type WorshipOrder = {
   completed_at: string | null;
   completed_by: string | null;
   admin_note: string | null;
-  line_bound?: boolean;  items?: WorshipOrderItem[];
+  line_bound?: boolean;line_notify_status?: "sent" | "failed" | "unbound" | null;
+line_notified_at?: string | null;items?: WorshipOrderItem[];
   member?: Pick<Account, "display_name" | "real_name" | "line_display_name"> | null;
 };
 
