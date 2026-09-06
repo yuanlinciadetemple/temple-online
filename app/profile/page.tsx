@@ -233,8 +233,7 @@ export default function ProfilePage() {
             綁定後，未來宮方完成祈福時，可透過 LINE 官方帳號通知您。
           </p>
 
-          {!bindCode && (
-            <button
+          {!a.line_user_id && !bindCode && (            <button
               type="button"
               disabled={bindLoading}
               onClick={createBindCode}
@@ -243,8 +242,16 @@ export default function ProfilePage() {
               {bindLoading ? "產生中…" : "產生 LINE 綁定碼"}
             </button>
           )}
-
-          {bindCode && (
+{a.line_user_id && (
+  <div className="mt-5 rounded-xl border border-green-600 bg-green-50 p-5 text-center">
+    <p className="text-lg font-bold text-green-700">
+      ✓ LINE 官方帳號已綁定
+    </p>
+    <p className="mt-2 text-sm text-ink/60">
+      宮方完成祈福後，將透過 LINE 官方帳號通知您。
+    </p>
+  </div>
+)}          {bindCode && (
             <div className="mt-5 border rounded-xl p-5 text-center bg-white">
               <p className="text-sm text-ink/60">
                 您的 LINE 綁定碼
