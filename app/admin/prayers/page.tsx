@@ -63,7 +63,7 @@ export default function PrayerAdminPage() {
         return;
       }
 
-      setToast("✓ 已完成祈福");
+      setToast("✓ 祈福已完成；LINE 通知結果請查看右側狀態");
       setSelected((s) => s.filter((x) => x !== id));
       await load();
     } finally {
@@ -369,7 +369,12 @@ export default function PrayerAdminPage() {
                           未綁定 LINE
                         </p>
                       )}
-                  </td>
+                    {o.status === "completed" &&
+  !o.line_notify_status && (
+    <p className="text-xs font-medium text-ink/50 mt-2">
+      舊紀錄｜無 LINE 通知資料
+    </p>
+  )}                  </td>
 
                   <td className="p-3">
                     <div className="flex flex-wrap gap-1">
