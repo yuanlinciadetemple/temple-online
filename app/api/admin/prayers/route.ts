@@ -22,6 +22,27 @@ export async function GET(req: NextRequest) {
   }
   if (q) query = query.or(`order_no.ilike.%${q}%,account_no.ilike.%${q}%,prayer_name.ilike.%${q}%`);
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+if (error) {
+  return NextResponse.json({ error: error.message }, { status: 500 });
 }
+
+const accountNos = [...new Set((data ?? []).map((o: any) => o.account_no))];
+
+const { data: accounts } = accountNos.length
+  ? await supabaseAdmin
+      .from("accounts")
+      .select("account_no, line_user_id")
+      .in("account_no", accountNos)
+  : { data: [] };
+
+const lineMap = new Map(
+  (accounts ?? []).map((a: any) => [a.account_no, !!a.line_user_id])
+);
+
+const result = (data ?? []).map((o: any) => ({
+  ...o,
+  line_bound: lineMap.get(o.account_no) ?? false,
+}));
+
+return NextResponse.json(result);}
